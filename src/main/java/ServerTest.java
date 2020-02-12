@@ -7,8 +7,7 @@ public class ServerTest {
         try {
             InetSocketAddress socketAddress = new InetSocketAddress("localhost",3000);
             SocketChannel client = SocketChannel.open(socketAddress);
-            JoinNodeRequestMessage msg = new JoinNodeRequestMessage();
-            msg.setSender(new Node(2, "127.0.0.1"));
+            JoinNodeRequestMessage msg = new JoinNodeRequestMessage(new Node(2, "127.0.0.1"));
             byte[] reqmsg = Util.serialize(msg);
             ByteBuffer buffer = ByteBuffer.wrap(reqmsg);
             client.write(buffer);

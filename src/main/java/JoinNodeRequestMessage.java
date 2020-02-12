@@ -4,6 +4,10 @@ public class JoinNodeRequestMessage implements Request {
 
     private Node sender;
 
+    public JoinNodeRequestMessage(Node sender) {
+        this.sender = sender;
+    }
+
     @Override
     public RequestType getType() {
         return type;

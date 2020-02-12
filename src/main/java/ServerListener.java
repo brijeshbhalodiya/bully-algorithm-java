@@ -14,10 +14,17 @@ public class ServerListener extends Thread{
     private int port = 3000;
     ServerSocketChannel serverSocketChannel;
     Selector selector;
+    private static Node node;
     private final static Cluster cluster = Cluster.getInstance();
 
 
-    public ServerListener() throws IOException {
+    public ServerListener(String nodeHostAddress, int priority) throws IOException{
+        this.init();
+        JoinNodeRequestMessage joinNodeRequestMessage = new JoinNodeRequestMessage(new Node(priority, nodeHostAddress));
+
+    }
+
+    public void init() throws IOException{
         this.selector = Selector.open();
         System.out.println("Selector is ready to make the connection: " + this.selector.isOpen());
 
@@ -28,12 +35,16 @@ public class ServerListener extends Thread{
         this.serverSocketChannel.configureBlocking(false);
 
         //Create node on which server is running & add that node into cluster
-        Node node = new Node(1, "localhost");
+        node = new Node(1, "localhost");
         this.cluster.addNode(node);
 
         int ops = serverSocketChannel.validOps();
         SelectionKey selectionKey = this.serverSocketChannel.register(selector, ops);
-        System.out.println("ServerListener.ServerListener");
+    }
+
+
+    public ServerListener() throws IOException {
+        this.init();
     }
 
     @Override
@@ -90,6 +101,29 @@ public class ServerListener extends Thread{
         }
     }
 
+    public static byte[] send(String host, int port, Request requestMsg) throws Exception{
+
+        InetSocketAddress socketAddress = new InetSocketAddress(host, port);
+        SocketChannel socketChannel = SocketChannel.open(socketAddress);
+
+        return send(socketChannel, requestMsg);
+
+    }
+
+    public static byte[] send(SocketChannel socketChannel, Request requestMsg) throws Exception{
+        socketChannel.configureBlocking(false);
+
+        if(!socketChannel.isConnected()){
+            return new byte[0];
+        }
+
+        byte[] msgBytes = Util.serialize(requestMsg);
+        ByteBuffer buffer = ByteBuffer.wrap(msgBytes);
+        socketChannel.write(buffer);
+
+        byte[] response = read(socketChannel);
+        return response;
+    }
 
     public static byte[] read(SocketChannel clientChannel) throws Exception{
 
