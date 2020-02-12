@@ -4,4 +4,6 @@ public interface Request extends Serializable {
 
     RequestType getType();
 
+    Node getSender();
+
 }

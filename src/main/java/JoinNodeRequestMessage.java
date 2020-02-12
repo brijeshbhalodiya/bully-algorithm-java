@@ -1,4 +1,4 @@
-public class JoinRequestMessage implements Request {
+public class JoinNodeRequestMessage implements Request {
 
     private final static RequestType type = RequestType.JOIN;
 

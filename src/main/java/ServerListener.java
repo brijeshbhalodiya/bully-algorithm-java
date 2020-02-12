@@ -41,16 +41,14 @@ public class ServerListener extends Thread{
         System.out.println("ServerListener.run");
         while(true){
             try {
-
+                this.selector.select();
 
                 Set<SelectionKey> selectedKey = this.selector.selectedKeys();
 //                System.out.println(selectedKey);
                 Iterator<SelectionKey> itr = selectedKey.iterator();
                 while(itr.hasNext()){
                     SelectionKey key = itr.next();
-                    System.out.println("hasnext");
                     if(key.isValid() && key.isAcceptable()){
-                        System.out.println("Valid");
                         SocketChannel clientChannel = this.serverSocketChannel.accept();
 
                         clientChannel.configureBlocking(false);
@@ -126,13 +124,18 @@ public class ServerListener extends Thread{
         switch (request.getType()){
 
             case JOIN:
-                System.out.println("join request");
+                Node node = request.getSender();
+                cluster.addNode(node);
                 break;
 
 
         }
 
     }
+
+//    public static void handleJoinRequest(SocketChannel clientChannel){
+//
+//    }
 
 
 
