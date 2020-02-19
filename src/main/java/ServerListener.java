@@ -19,9 +19,33 @@ public class ServerListener extends Thread{
 
 
     public ServerListener(String nodeHostAddress, int priority) throws IOException{
-        this.init();
-        JoinNodeRequestMessage joinNodeRequestMessage = new JoinNodeRequestMessage(new Node(priority, nodeHostAddress));
+        this.node = new Node(priority, InetAddress.getLocalHost().getHostAddress());
 
+        this.init();
+        JoinNodeRequestMessage joinNodeRequestMessage = new JoinNodeRequestMessage(this.node);
+        try {
+            byte[] responseBytes = send(nodeHostAddress, this.port, joinNodeRequestMessage);
+            Object obj = Util.deserialize(responseBytes);
+
+            if(obj instanceof Response){
+                Response response = (Response)obj;
+                Node senderNode = response.getSender();
+            }
+
+        }catch(Exception ex){
+            System.err.println("Unable to send joinNodeRequestMessage");
+        }
+
+    }
+
+    public ServerListener(int priority) throws  IOException{
+        this.node = new Node(priority, InetAddress.getLocalHost().getHostAddress());
+        this.init();
+    }
+
+    public ServerListener() throws IOException {
+        this.node = new Node(1, InetAddress.getLocalHost().getHostAddress());
+        this.init();
     }
 
     public void init() throws IOException{
@@ -35,16 +59,10 @@ public class ServerListener extends Thread{
         this.serverSocketChannel.configureBlocking(false);
 
         //Create node on which server is running & add that node into cluster
-        node = new Node(1, "localhost");
-        this.cluster.addNode(node);
+        this.cluster.addNode(this.node);
 
         int ops = serverSocketChannel.validOps();
         SelectionKey selectionKey = this.serverSocketChannel.register(selector, ops);
-    }
-
-
-    public ServerListener() throws IOException {
-        this.init();
     }
 
     @Override
