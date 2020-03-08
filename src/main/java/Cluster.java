@@ -31,6 +31,7 @@ public class Cluster implements Serializable {
     public synchronized boolean removeNode(Node node){
         if(this.nodes.remove(node)){
             Logger.logMsg("Node removed from the cluster " + node);
+            ServerListener.sendClusterUpdateRequest(this);
             return true;
         }
 

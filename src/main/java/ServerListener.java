@@ -1,3 +1,4 @@
+import java.io.ByteArrayInputStream;
 import java.io.IOException;
 import java.net.InetAddress;
 import java.net.InetSocketAddress;
@@ -25,15 +26,9 @@ public class ServerListener extends Thread{
         this.init();
         JoinNodeRequestMessage joinNodeRequestMessage = new JoinNodeRequestMessage(this.node);
         try {
+            Logger.logMsg("Sending JOIN_REQUEST");
             SocketChannel clientChannel = send(nodeHostAddress, this.port, joinNodeRequestMessage);
-//            byte[] responseBytes = read(clientChannel);
-//            System.out.println("responseByte " + responseBytes.length);
-//            Object obj = Util.deserialize(responseBytes);
-//
-//            if(obj instanceof Response){
-//                Response response = (Response)obj;
-//                Node senderNode = response.getSender();
-//            }
+            clientChannel.register(this.selector, SelectionKey.OP_READ);
 
         }catch(Exception ex){
             Logger.logError("Unable to send joinNodeRequestMessage");
@@ -76,7 +71,6 @@ public class ServerListener extends Thread{
                 this.selector.select();
 
                 Set<SelectionKey> selectedKey = this.selector.selectedKeys();
-//                System.out.println(selectedKey);
                 Iterator<SelectionKey> itr = selectedKey.iterator();
                 while(itr.hasNext()){
                     SelectionKey key = itr.next();
@@ -95,14 +89,16 @@ public class ServerListener extends Thread{
 
                         SocketChannel clientChannel = (SocketChannel)key.channel();
                         clientChannel.configureBlocking(false);
-
                         byte[] payload = read(clientChannel);
-
                         if(payload.length > 0){
-                            Object obj = Util.deserialize(payload);
 
+                            Object obj = Util.deserialize(payload);
                             if(obj instanceof Request){
                                 handleRequest((Request) obj, clientChannel);
+                            }
+
+                            if(obj instanceof Response){
+                                handleResponse((Response) obj, clientChannel);
                             }
 
                         }
@@ -155,10 +151,11 @@ public class ServerListener extends Thread{
         ByteBuffer buffer = ByteBuffer.allocate(4096);
         int bytesRead = clientChannel.read(buffer);
         int totalBytesRead = bytesRead;
-        while(bytesRead > 0){
-            bytesRead = clientChannel.read(buffer);
-            totalBytesRead += bytesRead;
-        }
+//        while(bytesRead > 0){
+//            bytesRead = clientChannel.read(buffer);
+//            System.out.println("bytesRead " + bytesRead);
+//            totalBytesRead += bytesRead;
+//        }
 
         if(bytesRead == -1){
             clientChannel.close();
@@ -185,18 +182,19 @@ public class ServerListener extends Thread{
                 cluster.addNode(node);
                 //Send ack to Join_Node requested node
                 ACKResponseMessage ackResponseMessage = new ACKResponseMessage(node);
-//                try {
-//                    send(clientChannel, ackResponseMessage);
-//                }catch(Exception ex){
-//                    System.err.println("Can't able to send response");
-//                }
+                try {
+                    Logger.logMsg("sending ACK Response");
+                    send(clientChannel, ackResponseMessage);
+                }catch(Exception ex){
+                    Logger.logError("Can't able to send response");
+                }
                 try {
                     clientChannel.close();
                 }catch (IOException ex){
                     Logger.logError("Unable to close channel");
                 }
                 //Send updated cluster list to all the nodes in cluster for synchronization of nodes
-                sendClusterUpdateRequest(cluster);
+//                sendClusterUpdateRequest(cluster);
                 break;
             }
 
@@ -208,6 +206,10 @@ public class ServerListener extends Thread{
             }
         }
 
+    }
+
+    public static void handleResponse(Response response, SocketChannel clientChannel){
+        
     }
 
     public static void sendClusterUpdateRequest(Cluster cluster){
