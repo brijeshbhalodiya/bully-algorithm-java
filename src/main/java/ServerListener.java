@@ -26,13 +26,14 @@ public class ServerListener extends Thread{
         JoinNodeRequestMessage joinNodeRequestMessage = new JoinNodeRequestMessage(this.node);
         try {
             SocketChannel clientChannel = send(nodeHostAddress, this.port, joinNodeRequestMessage);
-            byte[] responseBytes = read(clientChannel);
-            Object obj = Util.deserialize(responseBytes);
-
-            if(obj instanceof Response){
-                Response response = (Response)obj;
-                Node senderNode = response.getSender();
-            }
+//            byte[] responseBytes = read(clientChannel);
+//            System.out.println("responseByte " + responseBytes.length);
+//            Object obj = Util.deserialize(responseBytes);
+//
+//            if(obj instanceof Response){
+//                Response response = (Response)obj;
+//                Node senderNode = response.getSender();
+//            }
 
         }catch(Exception ex){
             System.err.println("Unable to send joinNodeRequestMessage");
@@ -131,6 +132,7 @@ public class ServerListener extends Thread{
     }
 
     public static SocketChannel send(SocketChannel socketChannel, Message msg) throws Exception{
+        System.out.println("sending message");
         socketChannel.configureBlocking(false);
 
         if(socketChannel.isConnected()){
@@ -144,6 +146,7 @@ public class ServerListener extends Thread{
     }
 
     public static byte[] read(SocketChannel clientChannel) throws Exception{
+        clientChannel.configureBlocking(false);
 
         if((clientChannel == null) || !clientChannel.isConnected()){
             System.out.println("Can't read from closed channel");
@@ -166,7 +169,6 @@ public class ServerListener extends Thread{
         byte[] bytes = new byte[totalBytesRead];
         buffer.flip();
         buffer.get(bytes);
-
         return bytes;
 
     }
@@ -176,43 +178,55 @@ public class ServerListener extends Thread{
         switch (request.getType()){
 
             case JOIN:
+            {
                 Node node = request.getSender();
                 cluster.addNode(node);
                 //Send ack to Join_Node requested node
                 ACKResponseMessage ackResponseMessage = new ACKResponseMessage(node);
-                try {
-                    send(clientChannel, ackResponseMessage);
-                }catch(Exception ex){
-                    System.err.println("Can't able to send response");
-                }
+//                try {
+//                    send(clientChannel, ackResponseMessage);
+//                }catch(Exception ex){
+//                    System.err.println("Can't able to send response");
+//                }
                 try {
                     clientChannel.close();
                 }catch (IOException ex){
                     System.err.println("Unable to close channel");
                 }
+                //Send updated cluster list to all the nodes in cluster for synchronization of nodes
                 sendClusterUpdateRequest(cluster);
                 break;
+            }
 
-
+            case CLUSTER_UPDATE:
+            {
+                ClusterUpdateRequestMessage reqMsg = (ClusterUpdateRequestMessage)request;
+                Cluster cluster = reqMsg.getCluster();
+                cluster.updateNodesList(cluster);
+                break;
+            }
         }
 
     }
 
     public static void sendClusterUpdateRequest(Cluster cluster){
-        boolean status = true;
+        System.out.println("sending cluster update request");
         final List<Node> nodes = cluster.getNodes();
         for(final Node n: nodes){
-            final ClusterUpdateRequestMessage msg = new ClusterUpdateRequestMessage(node, cluster);
-            Thread t = new Thread(new Runnable() {
-                @Override
-                public void run() {
-                    try {
-                        send(n.getHost(), port, msg);
-                    }catch(Exception ex){
-                        System.err.println("Unable to send cluster update message to " + n);
+            if(n.getHost() != node.getHost()){
+                final ClusterUpdateRequestMessage msg = new ClusterUpdateRequestMessage(node, cluster);
+                Thread t = new Thread(new Runnable() {
+                    @Override
+                    public void run() {
+                        try {
+                            send(n.getHost(), port, msg);
+                        }catch(Exception ex){
+                            System.err.println("Unable to send cluster update message to " + n);
+                        }
                     }
-                }
-            });
+                });
+                t.start();
+            }
         }
     }
 
