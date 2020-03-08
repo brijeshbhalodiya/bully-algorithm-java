@@ -11,13 +11,13 @@ public class Util {
             objectOutputStream.writeObject(toFlatten);
             serialized = byteArrayOutputStream.toByteArray();
         } catch (Exception problem) {
-            System.err.println("Unable to serialize the provided object to a byte array");
+            Logger.logError("Unable to serialize the provided object to a byte array");
             problem.printStackTrace();
         } finally {
             try {
                 objectOutputStream.close();
             } catch (Exception problem) {
-                System.err.println("Unable to serialize the provided object to a byte array");
+                Logger.logError("Unable to serialize the provided object to a byte array");
                 problem.printStackTrace();
             }
         }
@@ -27,7 +27,7 @@ public class Util {
     public static Object deserialize(final byte[] flattened) {
         Object deserialized = null;
         if (flattened == null || flattened.length == 0) {
-            System.err.println("Cannot deserialize an empty or null byte array");
+            Logger.logError("Cannot deserialize an empty or null byte array");
             return deserialized;
         }
         ObjectInputStream objectInputStream = null;
@@ -35,14 +35,14 @@ public class Util {
             objectInputStream = new ObjectInputStream(new ByteArrayInputStream(flattened));
             deserialized = objectInputStream.readObject();
         } catch (Exception problem) {
-            System.err.println("Unable to deserialize the provided byte array to an object");
+            Logger.logError("Unable to deserialize the provided byte array to an object");
             problem.printStackTrace();
         } finally {
             if (objectInputStream != null)
                 try {
                     objectInputStream.close();
                 } catch (Exception problem) {
-                    System.err.println("Unable to deserialize the provided byte array to an object");
+                    Logger.logError("Unable to deserialize the provided byte array to an object");
                     problem.printStackTrace();
                 }
         }

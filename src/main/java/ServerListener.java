@@ -36,7 +36,7 @@ public class ServerListener extends Thread{
 //            }
 
         }catch(Exception ex){
-            System.err.println("Unable to send joinNodeRequestMessage");
+            Logger.logError("Unable to send joinNodeRequestMessage");
         }
 
     }
@@ -48,12 +48,13 @@ public class ServerListener extends Thread{
 
     public ServerListener() throws IOException {
         this.node = new Node(1, InetAddress.getLocalHost().getHostAddress());
+        this.node = new Node(1, InetAddress.getLocalHost().getHostAddress());
         this.init();
     }
 
     public void init() throws IOException{
         this.selector = Selector.open();
-        System.out.println("Selector is ready to make the connection: " + this.selector.isOpen());
+        Logger.logMsg("Selector is ready to make the connection: " + this.selector.isOpen());
 
         this.serverSocketChannel = ServerSocketChannel.open();
         InetSocketAddress hostAddress = new InetSocketAddress(this.port);
@@ -70,7 +71,6 @@ public class ServerListener extends Thread{
 
     @Override
     public void run(){
-        System.out.println("ServerListener.run");
         while(true){
             try {
                 this.selector.select();
@@ -89,7 +89,7 @@ public class ServerListener extends Thread{
                         Socket socket = clientChannel.socket();
                         socket.setTcpNoDelay(true);
                         InetAddress ip = socket.getInetAddress();
-                        System.out.println("New connection: " + ip.getHostName());
+                        Logger.logMsg("New connection: " + ip.getHostName());
 
                     }else if(key.isValid() && key.isReadable()){
 
@@ -114,7 +114,7 @@ public class ServerListener extends Thread{
                 }
 
             } catch (Exception e) {
-                System.out.println("Encountered problem, exiting service loop");
+                Logger.logError("Encountered problem, exiting service loop");
                 e.printStackTrace();
                 System.exit(1);
             }
@@ -132,7 +132,7 @@ public class ServerListener extends Thread{
     }
 
     public static SocketChannel send(SocketChannel socketChannel, Message msg) throws Exception{
-        System.out.println("sending message");
+        Logger.logMsg("sending message");
         socketChannel.configureBlocking(false);
 
         if(socketChannel.isConnected()){
@@ -149,7 +149,7 @@ public class ServerListener extends Thread{
         clientChannel.configureBlocking(false);
 
         if((clientChannel == null) || !clientChannel.isConnected()){
-            System.out.println("Can't read from closed channel");
+            Logger.logMsg("Can't read from closed channel");
             return new byte[0];
         }
         ByteBuffer buffer = ByteBuffer.allocate(4096);
@@ -162,7 +162,7 @@ public class ServerListener extends Thread{
 
         if(bytesRead == -1){
             clientChannel.close();
-            System.out.println("Closed the client channel");
+            Logger.logMsg("Closed the client channel");
             return new byte[0];
         }
 
@@ -174,6 +174,8 @@ public class ServerListener extends Thread{
     }
 
     public static void handleRequest(Request request, SocketChannel clientChannel){
+
+        Logger.logMsg("Request Type " + request.getType());
 
         switch (request.getType()){
 
@@ -191,7 +193,7 @@ public class ServerListener extends Thread{
                 try {
                     clientChannel.close();
                 }catch (IOException ex){
-                    System.err.println("Unable to close channel");
+                    Logger.logError("Unable to close channel");
                 }
                 //Send updated cluster list to all the nodes in cluster for synchronization of nodes
                 sendClusterUpdateRequest(cluster);
@@ -201,8 +203,7 @@ public class ServerListener extends Thread{
             case CLUSTER_UPDATE:
             {
                 ClusterUpdateRequestMessage reqMsg = (ClusterUpdateRequestMessage)request;
-                Cluster cluster = reqMsg.getCluster();
-                cluster.updateNodesList(cluster);
+                cluster.updateNodesList(reqMsg.getCluster());
                 break;
             }
         }
@@ -210,18 +211,20 @@ public class ServerListener extends Thread{
     }
 
     public static void sendClusterUpdateRequest(Cluster cluster){
-        System.out.println("sending cluster update request");
+        Logger.logMsg("sending cluster update request");
+        System.out.println();
         final List<Node> nodes = cluster.getNodes();
         for(final Node n: nodes){
-            if(n.getHost() != node.getHost()){
+            if(!n.getHost().equalsIgnoreCase(node.getHost())){
                 final ClusterUpdateRequestMessage msg = new ClusterUpdateRequestMessage(node, cluster);
                 Thread t = new Thread(new Runnable() {
                     @Override
                     public void run() {
                         try {
+                            Logger.logMsg("Sending message to " + n + " from " + node);
                             send(n.getHost(), port, msg);
                         }catch(Exception ex){
-                            System.err.println("Unable to send cluster update message to " + n);
+                            Logger.logError("Unable to send cluster update message to " + n);
                         }
                     }
                 });
@@ -229,11 +232,5 @@ public class ServerListener extends Thread{
             }
         }
     }
-
-//    public static void handleJoinRequest(SocketChannel clientChannel){
-//
-//    }
-
-
 
 }

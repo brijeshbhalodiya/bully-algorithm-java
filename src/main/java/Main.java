@@ -11,7 +11,7 @@ public class Main{
                 try {
                     priority = Integer.parseInt(envPriority);
                 }catch(Exception ex){
-                    System.err.println("Invalid priority must be integer");
+                    Logger.logError("Invalid priority must be integer");
                     System.exit(-1);
                 }
             }
@@ -31,7 +31,7 @@ public class Main{
 
             server.start();
         } catch (Exception e) {
-            System.out.println("Error when starting the server");
+            Logger.logMsg("Error when starting the server");
         }
     }
 }

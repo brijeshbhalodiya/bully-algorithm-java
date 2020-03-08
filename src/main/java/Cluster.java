@@ -20,17 +20,17 @@ public class Cluster implements Serializable {
 
     public synchronized void addNode(Node node){
         this.nodes.add(node);
-        System.out.println("Node added into the cluster " + node);
+        Logger.logMsg("Node added into the cluster " + node);
     }
 
     public synchronized void updateNodesList(Cluster cluster){
         this.nodes = cluster.getNodes();
-        System.out.println("List of nodes in cluster is updated");
+        Logger.logMsg("List of nodes in cluster is updated");
     }
 
     public synchronized boolean removeNode(Node node){
         if(this.nodes.remove(node)){
-            System.out.println("Node removed from the cluster " + node);
+            Logger.logMsg("Node removed from the cluster " + node);
             return true;
         }
 
