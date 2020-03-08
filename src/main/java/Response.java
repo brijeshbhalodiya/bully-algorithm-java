@@ -1,7 +1,4 @@
-import java.io.Serializable;
 
-public interface Response extends Serializable {
+public interface Response extends Message {
     ResponseType getType();
-
-    Node getSender();
 }

@@ -8,10 +8,11 @@ import java.nio.channels.Selector;
 import java.nio.channels.ServerSocketChannel;
 import java.nio.channels.SocketChannel;
 import java.util.Iterator;
+import java.util.List;
 import java.util.Set;
 
 public class ServerListener extends Thread{
-    private int port = 3000;
+    private static final int port = 3000;
     ServerSocketChannel serverSocketChannel;
     Selector selector;
     private static Node node;
@@ -24,7 +25,8 @@ public class ServerListener extends Thread{
         this.init();
         JoinNodeRequestMessage joinNodeRequestMessage = new JoinNodeRequestMessage(this.node);
         try {
-            byte[] responseBytes = send(nodeHostAddress, this.port, joinNodeRequestMessage);
+            SocketChannel clientChannel = send(nodeHostAddress, this.port, joinNodeRequestMessage);
+            byte[] responseBytes = read(clientChannel);
             Object obj = Util.deserialize(responseBytes);
 
             if(obj instanceof Response){
@@ -119,28 +121,26 @@ public class ServerListener extends Thread{
         }
     }
 
-    public static byte[] send(String host, int port, Request requestMsg) throws Exception{
+    public static SocketChannel send(String host, int port, Message msg) throws Exception{
 
         InetSocketAddress socketAddress = new InetSocketAddress(host, port);
         SocketChannel socketChannel = SocketChannel.open(socketAddress);
 
-        return send(socketChannel, requestMsg);
+        return send(socketChannel, msg);
 
     }
 
-    public static byte[] send(SocketChannel socketChannel, Request requestMsg) throws Exception{
+    public static SocketChannel send(SocketChannel socketChannel, Message msg) throws Exception{
         socketChannel.configureBlocking(false);
 
-        if(!socketChannel.isConnected()){
-            return new byte[0];
+        if(socketChannel.isConnected()){
+            byte[] msgBytes = Util.serialize(msg);
+            ByteBuffer buffer = ByteBuffer.wrap(msgBytes);
+            socketChannel.write(buffer);
+            return socketChannel;
         }
 
-        byte[] msgBytes = Util.serialize(requestMsg);
-        ByteBuffer buffer = ByteBuffer.wrap(msgBytes);
-        socketChannel.write(buffer);
-
-        byte[] response = read(socketChannel);
-        return response;
+        return null;
     }
 
     public static byte[] read(SocketChannel clientChannel) throws Exception{
@@ -178,11 +178,42 @@ public class ServerListener extends Thread{
             case JOIN:
                 Node node = request.getSender();
                 cluster.addNode(node);
+                //Send ack to Join_Node requested node
+                ACKResponseMessage ackResponseMessage = new ACKResponseMessage(node);
+                try {
+                    send(clientChannel, ackResponseMessage);
+                }catch(Exception ex){
+                    System.err.println("Can't able to send response");
+                }
+                try {
+                    clientChannel.close();
+                }catch (IOException ex){
+                    System.err.println("Unable to close channel");
+                }
+                sendClusterUpdateRequest(cluster);
                 break;
 
 
         }
 
+    }
+
+    public static void sendClusterUpdateRequest(Cluster cluster){
+        boolean status = true;
+        final List<Node> nodes = cluster.getNodes();
+        for(final Node n: nodes){
+            final ClusterUpdateRequestMessage msg = new ClusterUpdateRequestMessage(node, cluster);
+            Thread t = new Thread(new Runnable() {
+                @Override
+                public void run() {
+                    try {
+                        send(n.getHost(), port, msg);
+                    }catch(Exception ex){
+                        System.err.println("Unable to send cluster update message to " + n);
+                    }
+                }
+            });
+        }
     }
 
 //    public static void handleJoinRequest(SocketChannel clientChannel){
