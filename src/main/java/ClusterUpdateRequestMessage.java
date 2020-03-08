@@ -3,10 +3,12 @@ public class ClusterUpdateRequestMessage implements Request {
 
     private Node sender;
     private Cluster cluster;
+    private Node leaderNode;
 
-    public ClusterUpdateRequestMessage(Node sender, Cluster cluster) {
+    public ClusterUpdateRequestMessage(Node sender, Cluster cluster, Node leaderNode) {
         this.sender = sender;
         this.cluster = cluster;
+        this.leaderNode = leaderNode;
     }
 
     @Override
@@ -29,5 +31,13 @@ public class ClusterUpdateRequestMessage implements Request {
 
     public void setCluster(Cluster cluster) {
         this.cluster = cluster;
+    }
+
+    public Node getLeaderNode() {
+        return leaderNode;
+    }
+
+    public void setLeaderNode(Node leaderNode) {
+        this.leaderNode = leaderNode;
     }
 }

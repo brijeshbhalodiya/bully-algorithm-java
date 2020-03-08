@@ -7,7 +7,7 @@ public class Logger {
     }
 
     static void logError(String msg){
-        System.err.println("[ " + (new Date()).toString() + " ] - " + msg);
+        System.err.println("[ " + (new Date()).toString() + " ] - ERROR - " + msg);
     }
 
 }

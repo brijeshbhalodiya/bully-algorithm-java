@@ -11,14 +11,22 @@ import java.nio.channels.SocketChannel;
 import java.util.Iterator;
 import java.util.List;
 import java.util.Set;
+import java.util.concurrent.TimeUnit;
 
-public class ServerListener extends Thread{
+public class ServerListener extends Thread implements ServiceHandler{
     private static final int port = 3000;
     ServerSocketChannel serverSocketChannel;
     Selector selector;
     private static Node node;
-    private final static Cluster cluster = Cluster.getInstance();
+    private static Node leaderNode;
 
+    private final static Cluster cluster = Cluster.getInstance();
+    private static FailureDetector failureDetector;
+
+    //For Election
+    private static boolean electionResponseArrived = false;
+    private static boolean leaderElected = false;
+    private static boolean isElectionRunning = false;
 
     public ServerListener(String nodeHostAddress, int priority) throws IOException{
         this.node = new Node(priority, InetAddress.getLocalHost().getHostAddress());
@@ -94,11 +102,11 @@ public class ServerListener extends Thread{
 
                             Object obj = Util.deserialize(payload);
                             if(obj instanceof Request){
-                                handleRequest((Request) obj, clientChannel);
+                                this.handleRequest((Request) obj, clientChannel);
                             }
 
                             if(obj instanceof Response){
-                                handleResponse((Response) obj, clientChannel);
+                                this.handleResponse((Response) obj, clientChannel);
                             }
 
                         }
@@ -170,7 +178,7 @@ public class ServerListener extends Thread{
 
     }
 
-    public static void handleRequest(Request request, SocketChannel clientChannel){
+    public void handleRequest(Request request, SocketChannel clientChannel){
 
         Logger.logMsg("Request Type " + request.getType());
 
@@ -194,7 +202,7 @@ public class ServerListener extends Thread{
                     Logger.logError("Unable to close channel");
                 }
                 //Send updated cluster list to all the nodes in cluster for synchronization of nodes
-//                sendClusterUpdateRequest(cluster);
+                this.sendClusterUpdateRequest(cluster);
                 break;
             }
 
@@ -202,29 +210,142 @@ public class ServerListener extends Thread{
             {
                 ClusterUpdateRequestMessage reqMsg = (ClusterUpdateRequestMessage)request;
                 cluster.updateNodesList(reqMsg.getCluster());
+                Node leader = reqMsg.getLeaderNode();
+                if(leader != null){
+                    leaderNode = leader;
+                    leaderElected = true;
+                }
+                break;
+            }
+
+            case ELECTION:
+            {
+                ElectionRequestMessage msg = (ElectionRequestMessage)request;
+                Node n = msg.getSender();
+                ElectionResponse response = new ElectionResponse(node);
+                try {
+                    send(clientChannel, response);
+                }catch (Exception ex){
+                    Logger.logError(ex.getMessage());
+                }
+                break;
+            }
+
+            case LEADER_UPDATE:
+            {
+                LeaderUpdateRequestMessage msg = (LeaderUpdateRequestMessage) request;
+                leaderNode = msg.getLeaderNode();
+                leaderElected = true;
                 break;
             }
         }
 
     }
 
-    public static void handleResponse(Response response, SocketChannel clientChannel){
-        
+    public void handleResponse(Response response, SocketChannel clientChannel){
+
+        Logger.logMsg("Respone Type " + response.getType());
+
+
+        switch (response.getType()){
+            case ELECTION_OK:
+            {
+                isElectionRunning = false;
+                electionResponseArrived = true;
+                break;
+            }
+        }
+
+
     }
 
-    public static void sendClusterUpdateRequest(Cluster cluster){
+    public void sendClusterUpdateRequest(Cluster cluster){
         Logger.logMsg("sending cluster update request");
         System.out.println();
         final List<Node> nodes = cluster.getNodes();
         for(final Node n: nodes){
-            if(!n.getHost().equalsIgnoreCase(node.getHost())){
-                final ClusterUpdateRequestMessage msg = new ClusterUpdateRequestMessage(node, cluster);
+            if(!n.equals(node)){
+                final ClusterUpdateRequestMessage msg = new ClusterUpdateRequestMessage(node, cluster, leaderNode);
                 Thread t = new Thread(new Runnable() {
                     @Override
                     public void run() {
                         try {
                             Logger.logMsg("Sending message to " + n + " from " + node);
                             send(n.getHost(), port, msg);
+                        }catch(Exception ex){
+                            Logger.logError("Unable to send cluster update message to " + n);
+                        }
+                    }
+                });
+                t.start();
+            }
+        }
+    }
+
+    public void startElection(){
+        Logger.logMsg("Starting Election.......");
+        final List<Node> nodes = cluster.getNodes();
+        if(nodes.size() >= 2){
+            final boolean[] higherPriorityNodeAvail = {false};
+            electionResponseArrived = false;
+            leaderElected = false;
+            isElectionRunning = true;
+            Thread t = new Thread(new Runnable() {
+                @Override
+                public void run() {
+                    for(Node n: nodes){
+                        if(!n.equals(node)){
+                            if(n.getPid() > node.getPid()){
+                                ElectionRequestMessage msg = new ElectionRequestMessage(node);
+                                Logger.logMsg("Sending message to " + n + " from " + node);
+                                try {
+                                    SocketChannel clientChannel = send(n.getHost(), port, msg);
+                                    clientChannel.register(selector, SelectionKey.OP_READ);
+                                    higherPriorityNodeAvail[0] = true;
+                                }catch (Exception ex){
+                                    Logger.logError("Can't able to send the election message to " + n + " from " + node);
+                                }
+                            }
+                        }
+                    }
+                    //If no any higher priority node available in cluster
+                    if(!higherPriorityNodeAvail[0]){
+                        leaderElected = true;
+                        leaderNode = node;
+                        sendLeaderElectedMessage(cluster, leaderNode);
+                    }
+                    try{
+
+                        TimeUnit.SECONDS.sleep(2);
+                        if(!electionResponseArrived){
+                            leaderElected = true;
+                            leaderNode = node;
+                            sendLeaderElectedMessage(cluster, leaderNode);
+                        }
+
+                    }catch (Exception ex){
+                        Logger.logError(ex.getMessage());
+                    }
+                }
+            });
+
+
+        }
+    }
+
+    @Override
+    public void sendLeaderElectedMessage(Cluster cluster, Node leaderNode) {
+        Logger.logMsg("sending leader update request");
+        final List<Node> nodes = cluster.getNodes();
+        for(final Node n: nodes){
+            if(!n.equals(node)){
+                final LeaderUpdateRequestMessage msg = new LeaderUpdateRequestMessage(leaderNode, node);
+                Thread t = new Thread(new Runnable() {
+                    @Override
+                    public void run() {
+                        try {
+                            Logger.logMsg("Sending message to " + n + " from " + node);
+                            SocketChannel clientChannel = send(n.getHost(), port, msg);
                         }catch(Exception ex){
                             Logger.logError("Unable to send cluster update message to " + n);
                         }

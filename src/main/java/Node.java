@@ -35,5 +35,15 @@ public class Node implements Serializable {
         return "PID: " + this.pid + " HOSTADDRESS: " + this.host;
     }
 
+    @Override
+    public boolean equals(Object obj) {
+        if(obj instanceof Node) {
+            Node node = (Node) obj;
+            if ((this.host.equalsIgnoreCase(node.host)) && (this.pid == node.pid)) {
+                return true;
+            }
+        }
 
+        return false;
+    }
 }

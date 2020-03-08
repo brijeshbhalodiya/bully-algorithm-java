@@ -28,10 +28,10 @@ public class Cluster implements Serializable {
         Logger.logMsg("List of nodes in cluster is updated");
     }
 
-    public synchronized boolean removeNode(Node node){
+    public synchronized boolean removeNode(Node node, ServiceHandler handler){
         if(this.nodes.remove(node)){
             Logger.logMsg("Node removed from the cluster " + node);
-            ServerListener.sendClusterUpdateRequest(this);
+            handler.sendClusterUpdateRequest(this);
             return true;
         }
 
@@ -53,4 +53,9 @@ public class Cluster implements Serializable {
     public void setNodes(List<Node> nodes) {
         this.nodes = nodes;
     }
+
+    public int getNumOfNodes(){
+        return this.nodes.size();
+    }
+
 }
