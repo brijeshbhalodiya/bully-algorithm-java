@@ -37,6 +37,7 @@ public class Node implements Serializable {
 
     @Override
     public boolean equals(Object obj) {
+        if(obj == null) return false;
         if(obj instanceof Node) {
             Node node = (Node) obj;
             if ((this.host.equalsIgnoreCase(node.host)) && (this.pid == node.pid)) {
