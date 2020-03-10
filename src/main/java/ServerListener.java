@@ -192,14 +192,6 @@ public class ServerListener extends Thread implements ServiceHandler{
                 try {
                     Logger.logMsg("sending ACK Response");
                     send(clientChannel, ackResponseMessage);
-//                    if((!leaderElected) || (leaderNode == null)){
-//                        if(cluster.getNumOfNodes() >= 2){
-//                            this.startElection();
-//                        }
-//                    }else{
-//                        failureDetector = new FailureDetector(selector, node, leaderNode, this);
-//                        failureDetector.start();
-//                    }
                 }catch(Exception ex){
                     Logger.logError("Can't able to send response");
                 }
@@ -225,15 +217,7 @@ public class ServerListener extends Thread implements ServiceHandler{
                     if(node.getPid() > leaderNode.getPid()){
                         this.startElection();
                     }else{
-                        if(failureDetector == null){
-                            failureDetector = new FailureDetector(selector, node, leaderNode, this);
-                        }
-                        //Stop failure detector if it is running
-                        if(failureDetector.isRunning()){
-                            failureDetector.stopFailureDetector();
-                        }
-                        //Start failure detector
-                        failureDetector.start(leaderNode);
+                        this.startFailureDetector(selector, node, leaderNode, this);
                     }
                 }else{
                     this.startElection();
@@ -280,15 +264,7 @@ public class ServerListener extends Thread implements ServiceHandler{
                 }
                 leaderNode = msg.getLeaderNode();
                 leaderElected = true;
-                if(failureDetector == null){
-                    failureDetector = new FailureDetector(selector, node, leaderNode, this);
-                }
-                //Stop failure detector if it is running
-                if((failureDetector != null) && failureDetector.isRunning()){
-                    failureDetector.stopFailureDetector();
-                }
-                //Start failure detector
-                failureDetector.start(leaderNode);
+                this.startFailureDetector(selector, node, leaderNode, this);
                 break;
             }
         }
@@ -325,7 +301,9 @@ public class ServerListener extends Thread implements ServiceHandler{
             case ALIVE:
             {
                 Logger.logMsg("-------------------Alive message is received---------------------");
-                failureDetector.setResponseArrived(true);
+                if(failureDetector != null){
+                    failureDetector.setResponseArrived(true);
+                }
                 break;
             }
         }
@@ -442,11 +420,24 @@ public class ServerListener extends Thread implements ServiceHandler{
                 t.start();
             }
         }
+
         //Stop failure detector
         if(failureDetector != null && failureDetector.isRunning()){
             failureDetector.stopFailureDetector();
         }
 
     }
+
+    @Override
+    public void startFailureDetector(Selector selector, Node node, Node leaderNode, ServiceHandler handler) {
+        if(failureDetector != null && failureDetector.isRunning()){
+            failureDetector.stopFailureDetector();
+        }
+
+        failureDetector = new FailureDetector(selector, node, leaderNode, handler);
+        failureDetector.start();
+
+    }
+
 
 }
